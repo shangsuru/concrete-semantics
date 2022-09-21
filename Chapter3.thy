@@ -13,7 +13,11 @@ To show that @{const asimp_const} really folds all subexpressions of the form
 *}
 
 fun optimal :: "aexp \<Rightarrow> bool" where
-(* your definition/proof here *)
+"optimal (Plus (N i) (N j)) = False" |
+"optimal (N n) = True" |
+"optimal (V x) = True" |
+"optimal (Plus a1 a2) = conj (optimal a1) (optimal a2)"
+
 
 text{*
 that checks that its argument does not contain a subexpression of the form
@@ -22,7 +26,9 @@ is optimal:
 *}
 
 lemma "optimal (asimp_const a)"
-(* your definition/proof here *)
+  apply(induction a)
+  apply(auto split:aexp.split)
+  done
 
 text{*
 This proof needs the same @{text "split:"} directive as the correctness proof of
@@ -46,10 +52,14 @@ constants in an expression by zeroes (they will be optimized away later):
 *}
 
 fun sumN :: "aexp \<Rightarrow> int" where
-(* your definition/proof here *)
+"sumN (N n) = n" |
+"sumN (V x) = 0" |
+"sumN (Plus a b) = sumN a + sumN b"
 
 fun zeroN :: "aexp \<Rightarrow> aexp" where
-(* your definition/proof here *)
+"zeroN (N n) = N 0" |
+"zeroN (V x) = V x" |
+"zeroN (Plus a b) = Plus (zeroN a) (zeroN b)"
 
 text {*
 Next, define a function @{text sepN} that produces an arithmetic expression
@@ -58,10 +68,24 @@ that adds the results of @{const sumN} and @{const zeroN}. Prove that
 *}
 
 definition sepN :: "aexp \<Rightarrow> aexp" where
-(* your definition/proof here *)
+"sepN a = Plus (N (sumN a)) (zeroN a)"
+
+(*
+lemma aux_1: "aval t s = sumN t + aval (zeroN t) s"   
+  apply(induction t arbitrary: s)
+  apply(auto)
+  done  
+    
+lemma aux_2: "aval (sepN t) s = sumN t + aval (zeroN t) s"
+  apply(induction t arbitrary:s)
+  apply(auto simp add:sepN_def)
+  done  
+*)
 
 lemma aval_sepN: "aval (sepN t) s = aval t s"
-(* your definition/proof here *)
+  apply(induction t)
+  apply(auto simp add:sepN_def)
+  done
 
 text {*
 Finally, define a function @{text full_asimp} that uses @{const asimp}
@@ -70,12 +94,12 @@ Prove that it preserves the value of an arithmetic expression.
 *}
 
 definition full_asimp :: "aexp \<Rightarrow> aexp" where
-(* your definition/proof here *)
+"full_asimp a = asimp (sepN a)"
 
 lemma aval_full_asimp: "aval (full_asimp t) s = aval t s"
-(* your definition/proof here *)
-
-
+  apply(induction t arbitrary:s)
+  apply(auto simp add:full_asimp_def sepN_def simp:algebra_simps)
+  done
 
 text{*
 \endexercise
@@ -87,7 +111,9 @@ by an expression in an expression. Define a substitution function
 *}
 
 fun subst :: "vname \<Rightarrow> aexp \<Rightarrow> aexp \<Rightarrow> aexp" where
-(* your definition/proof here *)
+"subst var a (N n) = N n" |
+"subst var a (V x) = (if var=x then a else (V x))" |
+"subst var a (Plus b c) = Plus (subst var a b) (subst var a c)" 
 
 text{*
 such that @{term "subst x a e"} is the result of replacing
@@ -100,7 +126,9 @@ substitute first and evaluate afterwards or evaluate with an updated state:
 *}
 
 lemma subst_lemma: "aval (subst x a e) s = aval e (s(x := aval a s))"
-(* your definition/proof here *)
+  apply(induction e)
+  apply(auto)
+  done
 
 text {*
 As a consequence prove that we can substitute equal expressions by equal expressions
@@ -108,7 +136,9 @@ and obtain the same result under evaluation:
 *}
 lemma "aval a1 s = aval a2 s
   \<Longrightarrow> aval (subst x a1 e) s = aval (subst x a2 e) s"
-(* your definition/proof here *)
+  apply(induction e)
+  apply(auto)
+  done
 
 text{*
 \endexercise
@@ -121,6 +151,8 @@ and @{const asimp} accordingly. You can remove @{const asimp_const}.
 Function @{const asimp} should eliminate 0 and 1 from multiplications
 as well as evaluate constant subterms. Update all proofs concerned.
 *}
+
+
 
 text{*
 \endexercise
@@ -138,6 +170,17 @@ division by changing the return type of @{text aval2} to
 @{typ "(val \<times> state) option"}. In case of division by 0 let @{text aval2}
 return @{const None}. Division on @{typ int} is the infix @{text div}.
 *}
+
+datatype aexp2 = N2 int | V2 vname | Plus2 aexp2 aexp2 | Times2 aexp2 aexp2 | Inc vname | Div aexp2 aexp2
+
+fun aval2 :: "aexp2 \<Rightarrow> state \<Rightarrow> (val \<times> state)" where
+"aval2 (N2 n) s = (n, s)" |
+"aval2 (V2 x) s = (s x, s)" |
+"aval2 (Plus2 a b) s = (fst (aval2 a s) + fst (aval2 b s), (\<lambda> x. (snd (aval2 a s) x) + (snd (aval2 b s) x) - (s x)))" |
+"aval2 (Times2 a b) s = (fst (aval2 a s) * fst (aval2 b s), (\<lambda> x. (snd (aval2 a s) x) + (snd (aval2 b s) x) - (s x)))" |
+"aval2 (Inc x) s = (s x, s(x:= 1 + s x))" |
+"aval2 (Div a b) s = (fst (aval2 a s) div fst (aval2 b s), (\<lambda> x. (snd (aval2 a s) x) + (snd (aval2 b s) x) - (s x)))"
+
 
 text{*
 \endexercise
