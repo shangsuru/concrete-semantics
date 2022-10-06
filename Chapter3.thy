@@ -1,7 +1,6 @@
 theory Chapter3
 imports "HOL-IMP.BExp"
         "HOL-IMP.ASM"
-        "Short_Theory"
 begin
 
 text{*
@@ -202,28 +201,48 @@ The expression \mbox{@{term "LET x e\<^sub>1 e\<^sub>2"}} is inlined by substitu
 the converted form of @{text e\<^sub>1} for @{text x} in the converted form of @{text e\<^sub>2}.
 See Exercise~\ref{exe:subst} for more on substitution.
 Prove that @{const inline} is correct w.r.t.\ evaluation.
-\endexercise
+\endexercise*}
 
 
+fun lval :: "lexp \<Rightarrow> state \<Rightarrow> int" where
+"lval (Nl a) s = a" |
+"lval (Vl x) s = s x" |
+"lval (Plusl a b) s = lval a s + lval b s" |
+"lval (LET v a b) s = lval b (s(v:= lval a s))"
+
+fun inline :: "lexp \<Rightarrow> aexp" where
+"inline (Nl a) = N a" |
+"inline (Vl x) = V x" |
+"inline (Plusl a b) = Plus (inline a) (inline b)" |
+"inline (LET v a b) = subst v (inline a) (inline b)"
+
+lemma "aval (inline e) s = lval e s"
+  apply (induction e arbitrary: s rule: inline.induct)
+  apply (auto simp: subst_lemma)
+  done
+
+text{*
 \exercise
 Show that equality and less-or-equal tests on @{text aexp} are definable
 *}
 
 definition Le :: "aexp \<Rightarrow> aexp \<Rightarrow> bexp" where
-(* your definition/proof here *)
+"Le a b = Not (Less b a)"
 
 definition Eq :: "aexp \<Rightarrow> aexp \<Rightarrow> bexp" where
-(* your definition/proof here *)
+"Eq a b = And (Not (Less a b)) (Not (Less b a)) "
 
 text{*
 and prove that they do what they are supposed to:
 *}
 
 lemma bval_Le: "bval (Le a1 a2) s = (aval a1 s \<le> aval a2 s)"
-(* your definition/proof here *)
+  apply(auto simp add: Le_def)
+  done
 
 lemma bval_Eq: "bval (Eq a1 a2) s = (aval a1 s = aval a2 s)"
-(* your definition/proof here *)
+  apply(auto simp add: Eq_def)
+  done
 
 text{*
 \endexercise
@@ -236,23 +255,35 @@ datatype ifexp = Bc2 bool | If ifexp ifexp ifexp | Less2 aexp aexp
 text {*  First define an evaluation function analogously to @{const bval}: *}
 
 fun ifval :: "ifexp \<Rightarrow> state \<Rightarrow> bool" where
-(* your definition/proof here *)
+"ifval (Bc2 b) s = b" |
+"ifval (If a b c) s = (if (ifval a s) then (ifval b s) else (ifval c s))" |
+"ifval (Less2 a b) s = (aval a s < aval b s)"
 
 text{* Then define two translation functions *}
 
 fun b2ifexp :: "bexp \<Rightarrow> ifexp" where
-(* your definition/proof here *)
+"b2ifexp (Bc b) = Bc2 b " |
+"b2ifexp (Not a) = If (b2ifexp a) (Bc2 False) (Bc2 True)" |
+"b2ifexp (And a b) = If (b2ifexp a) (b2ifexp b) (Bc2 False)" |
+"b2ifexp (Less a b) = Less2 a b"
 
 fun if2bexp :: "ifexp \<Rightarrow> bexp" where
-(* your definition/proof here *)
+"if2bexp (Bc2 b) = Bc b" |
+"if2bexp (If a b c) = (And (Not (And (if2bexp a) (Not (if2bexp b)))) 
+                           (Not (And (Not (if2bexp a)) (Not (if2bexp c)))))" |
+"if2bexp (Less2 a b) = Less a b"
 
 text{* and prove their correctness: *}
 
 lemma "bval (if2bexp exp) s = ifval exp s"
-(* your definition/proof here *)
+  apply(induction exp)
+  apply(auto)
+  done
 
 lemma "ifval (b2ifexp exp) s = bval exp s"
-(* your definition/proof here *)
+  apply(induction exp)
+  apply(auto)
+  done
 
 text{*
 \endexercise
@@ -280,7 +311,11 @@ text {* Define a function that checks whether a boolean exression is in NNF
 to @{const VAR}s: *}
 
 fun is_nnf :: "pbexp \<Rightarrow> bool" where
-(* your definition/proof here *)
+"is_nnf (VAR x) = True" |
+"is_nnf (NOT (VAR x)) = True" |
+"is_nnf (NOT p) = False" |
+"is_nnf (AND p1 p2) = (is_nnf p1 \<and> is_nnf p2)" |
+"is_nnf (OR p1 p2) = (is_nnf p1 \<and> is_nnf p2)"
 
 text{*
 Now define a function that converts a @{text bexp} into NNF by pushing
@@ -288,17 +323,34 @@ Now define a function that converts a @{text bexp} into NNF by pushing
 *}
 
 fun nnf :: "pbexp \<Rightarrow> pbexp" where
-(* your definition/proof here *)
+"nnf (VAR x) = VAR x" |
+"nnf (AND p1 p2) = AND (nnf p1) (nnf p2)" | 
+"nnf (OR p1 p2) = OR (nnf p1) (nnf p2)" |
+"nnf (NOT (VAR x)) = NOT (VAR x)" |
+"nnf (NOT (NOT x)) = nnf x" |
+"nnf (NOT (AND p1 p2)) = OR (nnf (NOT p1)) (nnf (NOT p2))" |
+"nnf (NOT (OR p1 p2)) = AND (nnf (NOT p1)) (nnf (NOT p2))" 
+
+value "nnf (NOT (OR (NOT (AND (VAR ''x'') (VAR ''y''))) (VAR ''z'')))"
 
 text{*
 Prove that @{const nnf} does what it is supposed to do:
 *}
 
+lemma neg_aux [simp]: "pbval (nnf (NOT b)) s = (\<not> (pbval (nnf b) s))"
+  apply(induction b)
+  apply(auto)
+  done
+
 lemma pbval_nnf: "pbval (nnf b) s = pbval b s"
-(* your definition/proof here *)
+  apply(induction b)
+  apply(auto)
+  done
 
 lemma is_nnf_nnf: "is_nnf (nnf b)"
-(* your definition/proof here *)
+  apply(induction b rule: nnf.induct)
+  apply(auto)
+  done
 
 text{*
 An expression is in DNF (disjunctive normal form) if it is in NNF
@@ -306,8 +358,19 @@ and if no @{const OR} occurs below an @{const AND}. Define a corresponding
 test:
 *}
 
+fun no_ors :: "pbexp \<Rightarrow> bool" where
+"no_ors (OR e1 e2) = False" |
+"no_ors (AND e1 e2) = (no_ors e1 \<and> no_ors e2)" |
+"no_ors e = True"
+
 fun is_dnf :: "pbexp \<Rightarrow> bool" where
-(* your definition/proof here *)
+"is_dnf (VAR _) = True" |
+"is_dnf (NOT b) = is_nnf (NOT b)" |
+"is_dnf (AND b1 b2) =  (no_ors b1 \<and> no_ors b2 \<and> is_dnf b1 \<and> is_dnf b2)" |
+"is_dnf (OR b1 b2) = (is_dnf b1 \<and> is_dnf b2)"
+
+value "is_dnf (OR (AND (NOT (VAR ''x'')) (VAR ''y'')) (VAR ''z''))"
+value "is_dnf (AND (OR (NOT (VAR ''x'')) (VAR ''y'')) (VAR ''z''))"
 
 text {*
 An NNF can be converted into a DNF in a bottom-up manner.
@@ -320,30 +383,58 @@ we can express the distributivity step as follows:
 *}
 
 fun dist_AND :: "pbexp \<Rightarrow> pbexp \<Rightarrow> pbexp" where
-(* your definition/proof here *)
+"dist_AND (OR a b) c = OR (dist_AND a c) (dist_AND b c)" |
+"dist_AND a (OR b c) = OR (dist_AND a b) (dist_AND a c)" |
+"dist_AND a b = AND a b" 
 
 text {* and prove that it behaves as follows: *}
 
-lemma pbval_dist: "pbval (dist_AND b1 b2) s = pbval (AND b1 b2) s"
-(* your definition/proof here *)
+lemma pbval_dist [simp]: "pbval (dist_AND b1 b2) s = pbval (AND b1 b2) s"
+  apply(induction b1 b2 rule: dist_AND.induct)
+  apply(auto)
+  done
 
 lemma is_dnf_dist: "is_dnf b1 \<Longrightarrow> is_dnf b2 \<Longrightarrow> is_dnf (dist_AND b1 b2)"
-(* your definition/proof here *)
+  apply(induction b1 b2 rule: dist_AND.induct)
+  apply(auto)
+  done
 
 text {* Use @{const dist_AND} to write a function that converts an NNF
   to a DNF in the above bottom-up manner.
 *}
 
 fun dnf_of_nnf :: "pbexp \<Rightarrow> pbexp" where
-(* your definition/proof here *)
+"dnf_of_nnf (VAR x) = VAR x" |
+"dnf_of_nnf (NOT a) = NOT a" |
+"dnf_of_nnf (AND a b) = dist_AND (dnf_of_nnf a) (dnf_of_nnf b)" |
+"dnf_of_nnf (OR a b) = OR (dnf_of_nnf a) (dnf_of_nnf b)" 
+
+value "dnf_of_nnf (AND 
+                       (AND 
+                          (VAR ''b'') 
+                          (OR 
+                            (NOT (VAR ''c'')) 
+                            (VAR ''d'')
+                          ) 
+                       ) 
+                       (NOT (VAR ''a'')) 
+                  )"
 
 text {* Prove the correctness of your function: *}
 
 lemma "pbval (dnf_of_nnf b) s = pbval b s"
-(* your definition/proof here *)
+  apply(induction b)
+  apply(auto)
+  done
+
+lemma [simp]: "is_dnf a \<Longrightarrow> is_dnf b \<Longrightarrow> is_dnf (dist_AND a b)"
+  apply(induction a b rule: dist_AND.induct)
+  apply(auto)
+  done
 
 lemma "is_nnf b \<Longrightarrow> is_dnf (dnf_of_nnf b)"
-(* your definition/proof here *)
+  apply(induction b )
+  apply(auto)
 
 text{*
 \endexercise
