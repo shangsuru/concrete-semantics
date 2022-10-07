@@ -25,10 +25,12 @@ the tests if a tree is ordered:
 *}
 
 fun set :: "'a tree \<Rightarrow> 'a set"  where
-(* your definition/proof here *)
+"set Tip = {}" |
+"set (Node l v r) = (set l) \<union> {v} \<union> (set r)"
 
 fun ord :: "int tree \<Rightarrow> bool"  where
-(* your definition/proof here *)
+"ord Tip = True" |
+"ord (Node l v r) = ((\<forall>x \<in> set l. x \<le> v) \<and> (\<forall>x \<in> set r. v \<le> x) \<and> ord l \<and> ord r)"
 
 text{* Hint: use quantifiers.
 
@@ -38,15 +40,22 @@ same tree should be returned.
 *}
 
 fun ins :: "int \<Rightarrow> int tree \<Rightarrow> int tree"  where
-(* your definition/proof here *)
+"ins x Tip = (Node Tip x Tip)" |
+"ins x (Node l v r) = (if x = v then Node l v r
+                       else if x < v then Node (ins x l) v r 
+                       else Node l v (ins x r))"
 
 text{* Prove correctness of @{const ins}: *}
 
-lemma set_ins: "set(ins x t) = {x} \<union> set t"
-(* your definition/proof here *)
+lemma set_ins [simp]: "set(ins x t) = {x} \<union> set t"
+  apply(induction t)
+  apply(auto)
+  done
 
 theorem ord_ins: "ord t \<Longrightarrow> ord(ins i t)"
-(* your definition/proof here *)
+  apply(induction t arbitrary: i)
+  apply(auto)
+  done
 
 text{*
 \endexercise
