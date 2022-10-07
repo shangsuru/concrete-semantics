@@ -435,6 +435,7 @@ lemma [simp]: "is_dnf a \<Longrightarrow> is_dnf b \<Longrightarrow> is_dnf (dis
 lemma "is_nnf b \<Longrightarrow> is_dnf (dnf_of_nnf b)"
   apply(induction b )
   apply(auto)
+  done
 
 text{*
 \endexercise
@@ -475,7 +476,9 @@ the result is the new register state: *}
 type_synonym rstate = "reg \<Rightarrow> val"
 
 fun exec1 :: "instr \<Rightarrow> state \<Rightarrow> rstate \<Rightarrow> rstate" where
-(* your definition/proof here *)
+"exec1 (LDI i r) s rs = rs(r:= i)" |
+"exec1 (LD x r) s rs = rs(r:= s(x))" |
+"exec1 (ADD r1 r2) s rs = rs(r1:= (rs r1) + (rs r2))"
 
 text{*
 Define the execution @{const[source] exec} of a list of instructions as for the stack machine.
@@ -487,8 +490,30 @@ for intermediate results, the ones @{text "< r"} should be left alone.
 Define the compiler and prove it correct:
 *}
 
+fun exec :: "instr list \<Rightarrow> state \<Rightarrow> rstate \<Rightarrow> rstate" where
+"exec [] _ rs = rs" |
+"exec (i # is) s rs = exec is s (exec1 i s rs)"
+
+fun comp :: "aexp \<Rightarrow> reg \<Rightarrow> instr list" where
+"comp (N n) r =  [LDI n r]" |
+"comp (V x) r = [LD x r]" |
+"comp (Plus a1 a2) r = (comp a1 r) @ (comp a2 (r+1)) @ [ADD r (r+1)]"
+
+lemma [simp]: "exec (xs @ ys) s rs = exec ys s (exec xs s rs)"
+  apply(induction xs arbitrary: rs)
+  apply(auto)
+  done
+
+lemma [simp]: "r < q \<Longrightarrow> exec (comp a q) s rs r = rs r"
+  apply(induction a arbitrary: rs r q)
+  apply(auto)
+  done
+
+
 theorem "exec (comp a r) s rs r = aval a s"
-(* your definition/proof here *)
+  apply(induction a arbitrary: rs r)
+  apply(auto)
+  done
 
 text{*
 \endexercise
@@ -509,7 +534,10 @@ adds the value in register @{text r} to the value in register 0;
 *}
 
 fun exec01 :: "instr0 \<Rightarrow> state \<Rightarrow> rstate \<Rightarrow> rstate" where
-(* your definition/proof here *)
+"exec01 (LDI0 x) s rs = rs(0:= x)" |
+"exec01 (LD0 v) s rs = rs(0:= (s v))" |
+"exec01 (MV0 r) s rs = rs(r:= (rs 0))" |
+"exec01 (ADD0 r) s rs = rs(0:=(rs 0) + (rs r))" 
 
 text{*
 and @{const exec0} for instruction lists.
@@ -521,8 +549,29 @@ for intermediate results, the ones @{text "\<le> r"} should be left alone
 (with the exception of 0). Define the compiler and prove it correct:
 *}
 
+fun exec0 :: "instr0 list \<Rightarrow> state \<Rightarrow> rstate \<Rightarrow> rstate" where
+"exec0 [] _ rs = rs" |
+"exec0 (x # xs) s rs = exec0 xs s (exec01 x s rs)"
+
+fun comp0 :: "aexp \<Rightarrow> reg \<Rightarrow> instr0 list" where
+"comp0 (N n) r = [LDI0 n]" |
+"comp0 (V x) r = [LD0 x]" |
+"comp0 (Plus a b) r = (comp0 a (r+1)) @ [MV0 (r+1)] @ (comp0 b (r+2)) @ [ADD0 (r+1)]"
+
+lemma [simp]: "exec0 (xs @ ys) s rs = exec0 ys s (exec0 xs s rs)"
+  apply(induction xs arbitrary: rs)
+  apply(auto)
+  done
+
+lemma [simp]: "(0 < r) \<and> (r \<le> q) \<Longrightarrow> exec0 (comp0 a q) s rs r = rs r"
+  apply(induction a arbitrary: r q rs)
+  apply(auto)
+  done
+
 theorem "exec0 (comp0 a r) s rs 0 = aval a s"
-(* your definition/proof here *)
+  apply(induction a arbitrary: r rs)
+  apply(auto)
+  done
 
 text{*
 \endexercise
