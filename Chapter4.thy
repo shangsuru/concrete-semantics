@@ -140,12 +140,16 @@ as an inductive predicate
 *}
 
 inductive palindrome :: "'a list \<Rightarrow> bool" where
-(* your definition/proof here *)
+palinEmpty: "palindrome []" |
+palinSingle: "palindrome [x]" |
+palinSS: "palindrome xs ==> palindrome (a # xs @ [a])"
 
 text {* and prove *}
 
 lemma "palindrome xs \<Longrightarrow> rev xs = xs"
-(* your definition/proof here *)
+  apply(induction rule: palindrome.induct)
+    apply(auto)
+  done
 
 text{*
 \endexercise
@@ -164,12 +168,17 @@ steps. Prove
 *}
 
 lemma "star' r x y \<Longrightarrow> star r x y"
-(* your definition/proof here *)
+  apply(induction rule: star'.induct)
+   apply (simp add: star.refl)
+  by (metis star.simps star_trans)
 
-
+lemma [simp]: " star' r y z \<Longrightarrow> r x y \<Longrightarrow> star' r x z"
+  apply(induction rule: star'.induct)
+  by (auto intro: step' refl')
 
 lemma "star r x y \<Longrightarrow> star' r x y"
-(* your definition/proof here *)
+  apply(induction rule: star.induct)
+  by (auto intro: refl')
 
 text{*
 You may need lemmas. Note that rule induction fails
@@ -185,14 +194,18 @@ all @{prop"i < n"}:
 *}
 
 inductive iter :: "('a \<Rightarrow> 'a \<Rightarrow> bool) \<Rightarrow> nat \<Rightarrow> 'a \<Rightarrow> 'a \<Rightarrow> bool" for r where
-(* your definition/proof here *)
+iter0: "iter r 0 x x" |
+iterS: "r x y \<Longrightarrow> iter r n y z \<Longrightarrow> iter r (Suc n) x z"
 
 text{*
 Correct and prove the following claim:
 *}
 
-lemma "star r x y \<Longrightarrow> iter r n x y"
-(* your definition/proof here *)
+lemma "star r x y \<Longrightarrow> \<exists>n. iter r n x y"
+  apply(induction rule: star.induct)
+   apply(auto intro: iter0 iterS)
+  done
+ 
 
 text{*
 \endexercise
@@ -222,21 +235,36 @@ Define them as inductive predicates and prove their equivalence:
 *}
 
 inductive S :: "alpha list \<Rightarrow> bool" where
-(* your definition/proof here *)
+S0: "S []" |
+aSb: "S w \<Longrightarrow> S (a # w @ [b])" |
+SS: "S w \<Longrightarrow> S x \<Longrightarrow> S (w @ x)"
+
 
 inductive T :: "alpha list \<Rightarrow> bool" where
-(* your definition/proof here *)
+T0: "T []" |
+TaTb: "T w \<Longrightarrow> T x \<Longrightarrow> T (w @ [a] @ x @ [b])"
 
 lemma TS: "T w \<Longrightarrow> S w"
-(* your definition/proof here *)
+  apply(induction rule: T.induct)
+   apply(auto intro: S0 aSb SS)
+  done
 
-
+lemma TT: "T x \<Longrightarrow> T w \<Longrightarrow> T (w @ x)"
+  apply(induction rule: T.induct)
+   apply(simp)
+  by (metis TaTb append.assoc)
+  
 
 lemma ST: "S w \<Longrightarrow> T w"
-(* your definition/proof here *)
+  apply(induction rule: S.induct)
+    apply(simp add: T0)
+   apply (metis T.simps append.left_neutral append_Cons)
+  apply(simp add: TT)
+  done
+ 
 
 corollary SeqT: "S w \<longleftrightarrow> T w"
-(* your definition/proof here *)
+  by(auto simp add: TS ST)
 
 text{*
 \endexercise
@@ -251,16 +279,27 @@ the recursive function:
 *}
 
 inductive aval_rel :: "aexp \<Rightarrow> state \<Rightarrow> val \<Rightarrow> bool" where
-(* your definition/proof here *)
+avalN: "aval_rel (N n) s n" |
+avalV: "aval_rel (V x) s (s x)" |
+avalPlus: "aval_rel a1 s x \<Longrightarrow> aval_rel a2 s y \<Longrightarrow> aval_rel (Plus a1 a2) s (x+y)"
 
-lemma aval_rel_aval: "aval_rel a s v \<Longrightarrow> aval a s = v"
-(* your definition/proof here *)
+lemma aval_rel_aval: "aval_rel x s v \<Longrightarrow> aval x s = v"
+  apply(induction rule: aval_rel.induct)
+  by (auto)
 
-lemma aval_aval_rel: "aval a s = v \<Longrightarrow> aval_rel a s v"
-(* your definition/proof here *)
+lemma [simp]: "aval x1 s + aval x2 s = z \<Longrightarrow> aval_rel (Plus x1 x2) s z"
+  sorry
 
-corollary "aval_rel a s v \<longleftrightarrow> aval a s = v"
-(* your definition/proof here *)
+lemma [simp]: " aval (Plus x1 x2) s = v \<Longrightarrow> aval_rel (Plus x1 x2) s v"
+  by auto
+
+lemma aval_aval_rel: "aval x s = v \<Longrightarrow> aval_rel x s v"
+  apply(induction x arbitrary: s)
+    apply(auto intro: avalN avalV)
+  done
+  
+corollary "aval_rel x s v \<longleftrightarrow> aval x s = v"
+  using aval_aval_rel aval_rel_aval by blast
 
 text{*
 \endexercise
@@ -273,7 +312,6 @@ Define an inductive predicate
 *}
 
 inductive ok :: "nat \<Rightarrow> instr list \<Rightarrow> nat \<Rightarrow> bool" where
-(* your definition/proof here *)
 
 text{*
 such that @{text "ok n is n'"} means that with any initial stack of length
