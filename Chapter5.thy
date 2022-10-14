@@ -1,5 +1,5 @@
 theory Chapter5
-imports Main
+  imports Main
 begin
 
 lemma "\<not> surj(f :: 'a \<Rightarrow> 'a set)"
@@ -8,14 +8,6 @@ proof
   hence "\<exists>a. {x. x \<notin> f x} = f a" by(auto simp: surj_def)
   thus "False" by blast
 qed
-
-inductive star :: "('a \<Rightarrow> 'a \<Rightarrow> bool) \<Rightarrow> 'a \<Rightarrow> 'a \<Rightarrow> bool"  for r where
-refl:  "star r x x" |
-step:  "r x y \<Longrightarrow> star r y z \<Longrightarrow> star r x z"
-
-inductive iter :: "('a \<Rightarrow> 'a \<Rightarrow> bool) \<Rightarrow> nat \<Rightarrow> 'a \<Rightarrow> 'a \<Rightarrow> bool" for r where
-iter_0: "iter r 0 x x" |
-iter_Suc: "r x y \<Longrightarrow> iter r n y z \<Longrightarrow> iter r (Suc n) x z"
 
 text{*
 \section*{Chapter 5}
@@ -29,15 +21,15 @@ lemma assumes T: "\<forall>x y. T x y \<or> T y x"
   shows "T x y"
 proof -
   have "T x y \<or> T y x" using T by blast
-  then show "T x y"
+  thus "T x y"
   proof
     assume "T x y"
-    then show "T x y" by simp
+    thus "T x y" by simp
   next
     assume "T y x"
     hence "A y x" using TA by blast
     hence "x = y" using assms(4) A by blast
-    then show "T x y" using \<open>T y x\<close> by auto
+    thus "T x y" using \<open>T y x\<close> by auto
   qed
 qed
 
@@ -70,7 +62,24 @@ next
     by (smt (verit, ccfv_SIG) add.assoc add.commute add.right_neutral add_diff_cancel_right' add_self_div_2 append_take_drop_id div_add1_eq drop_drop length_append length_drop not_mod_2_eq_0_eq_1)
   thus ?thesis by blast
 qed
-    
+
+lemma "length (tl xs) = length xs - 1"
+proof (cases xs)
+  case Nil
+  thus ?thesis by simp
+next
+  case (Cons y ys)
+  thus ?thesis by simp
+qed
+  
+lemma "\<Sum>{0..n::nat} = n*(n+1) div 2"
+proof (induction n)
+  case 0
+  show "?case" by simp
+next
+  case (Suc n)
+  thus "?case" by simp
+qed
 
 text{*
 Hint: There are predefined functions @{const take} and {const drop} of type
@@ -85,16 +94,30 @@ Give a structured proof by rule inversion:
 inductive ev :: "nat \<Rightarrow> bool" where
 ev0: "ev 0" |
 evSS: "ev n \<Longrightarrow> ev(Suc(Suc n))"
+
 lemma assumes a: "ev(Suc(Suc n))" shows "ev n"
-(* your definition/proof here *)
+proof -
+  show ?thesis using a
+  proof cases
+    case evSS
+    then show ?thesis by auto
+  qed
+qed
+   
+
+
 
 text{*
 \exercise
 Give a structured proof by rule inversions:
 *}
 
-lemma "\<not> ev(Suc(Suc(Suc 0)))"
-(* your definition/proof here *)
+lemma "\<not> ev(Suc(Suc(Suc 0)))" (is "\<not>?P")
+proof
+  assume "?P"
+  hence "ev (Suc 0)" using ev.cases by auto
+  thus "False" using ev.cases by auto
+qed
 
 text{*
 If there are no cases to be proved you can close
@@ -106,8 +129,22 @@ Recall predicate @{const star} from Section 4.5 and @{const iter}
 from Exercise~\ref{exe:iter}.
 *}
 
+inductive star :: "('a \<Rightarrow> 'a \<Rightarrow> bool) \<Rightarrow> 'a \<Rightarrow> 'a \<Rightarrow> bool"  for r where
+refl:  "star r x x" |
+step:  "r x y \<Longrightarrow> star r y z \<Longrightarrow> star r x z"
+
+inductive iter :: "('a \<Rightarrow> 'a \<Rightarrow> bool) \<Rightarrow> nat \<Rightarrow> 'a \<Rightarrow> 'a \<Rightarrow> bool" for r where
+iter_0: "iter r 0 x x" |
+iter_Suc: "r x y \<Longrightarrow> iter r n y z \<Longrightarrow> iter r (Suc n) x z"
+
 lemma "iter r n x y \<Longrightarrow> star r x y"
-(* your definition/proof here *)
+proof (induction rule: iter.induct)
+  case (iter_0 x)
+  thus ?case by (simp add: star.refl)
+next
+  case (iter_Suc x y n z)
+  thus ?case by (simp add: star.step)
+qed
 
 text{*
 Prove this lemma in a structured style, do not just sledgehammer each case of the
@@ -119,12 +156,38 @@ Define a recursive function
 *}
 
 fun elems :: "'a list \<Rightarrow> 'a set" where
-(* your definition/proof here *)
+"elems [] = {}" |
+"elems (x#xs) = {x} \<union> elems xs"
+
+value "elems ([1,2,2,4,4,3,4]::(nat list))" 
 
 text{* that collects all elements of a list into a set. Prove *}
 
 lemma "x \<in> elems xs \<Longrightarrow> \<exists>ys zs. xs = ys @ x # zs \<and> x \<notin> elems ys"
-(* your definition/proof here *)
+proof (induction xs)
+  case Nil
+  then show ?case by auto 
+next
+  case (Cons a xs)
+  then show ?case
+  proof cases
+    assume "a = x"
+    then obtain ys where ys: "(ys::'a list) = []" by auto
+    then obtain zs where zs: "zs = xs" by auto
+    then have "x \<notin> elems ys" using ys by auto
+    thus ?case using \<open>a = x\<close> ys by blast
+  next
+    assume "a \<noteq> x"
+    then have "x : elems xs" using Cons.prems by auto
+    then obtain ys old_ys zs where
+      "ys = a # old_ys"
+      "xs = old_ys @ x # zs"
+      "x \<notin> elems old_ys"
+    using Cons.IH by blast
+  then have "a # xs = ys @ x # zs \<and> x \<notin> elems ys" using `a \<noteq> x` by auto
+  then show ?case by auto
+  qed
+qed
 
 text{*
 \endexercise
