@@ -9,12 +9,6 @@ text{*
 Use the \textbf{value} command to evaluate the following expressions:
 *}
 
- "1 + (2::nat)"
- "1 + (2::int)"
- "1 - (2::nat)"
- "1 - (2::int)"
- "[a,b] @ [c,d]"
-
 value "1 + (2::nat)"
 value "1 + (2::int)"
 value "1 - (2::nat)"
@@ -163,6 +157,7 @@ in the main text. Then prove the same property in Isabelle:
 lemma "sum_upto n = n * (n+1) div 2"
   apply(induction n)
   apply(auto)
+  done
 
 text{*
 \endexercise

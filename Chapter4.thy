@@ -287,15 +287,9 @@ lemma aval_rel_aval: "aval_rel x s v \<Longrightarrow> aval x s = v"
   apply(induction rule: aval_rel.induct)
   by (auto)
 
-lemma [simp]: "aval x1 s + aval x2 s = z \<Longrightarrow> aval_rel (Plus x1 x2) s z"
-  sorry
-
-lemma [simp]: " aval (Plus x1 x2) s = v \<Longrightarrow> aval_rel (Plus x1 x2) s v"
-  by auto
-
 lemma aval_aval_rel: "aval x s = v \<Longrightarrow> aval_rel x s v"
-  apply(induction x arbitrary: s)
-    apply(auto intro: avalN avalV)
+  apply(induction x arbitrary: v)
+    apply(auto intro: avalN avalV avalPlus)
   done
   
 corollary "aval_rel x s v \<longleftrightarrow> aval x s = v"
@@ -312,6 +306,10 @@ Define an inductive predicate
 *}
 
 inductive ok :: "nat \<Rightarrow> instr list \<Rightarrow> nat \<Rightarrow> bool" where
+ok_0: "ok n [] n" |
+ok_LDI: "ok n is n' \<Longrightarrow> ok n (is @ [LOADI k]) (Suc n')" | 
+ok_LD: "ok n is n' \<Longrightarrow> ok n (is @ [LOAD k]) (Suc n')" | 
+ok_ADD: "ok n is (Suc (Suc n')) \<Longrightarrow> ok n (is @ [ADD]) (Suc n')"
 
 text{*
 such that @{text "ok n is n'"} means that with any initial stack of length
@@ -321,19 +319,21 @@ without stack underflow and that the final stack has length @{text n'}.
 Using the introduction rules for @{const ok},
 prove the following special cases: *}
 
-lemma "ok 0 [LOAD x] (Suc 0)"
-(* your definition/proof here *)
+lemma "ok 0 [LOAD x] (Suc 0)" 
+  by (metis append_Nil ok_0 ok_LD)
 
 lemma "ok 0 [LOAD x, LOADI v, ADD] (Suc 0)"
-(* your definition/proof here *)
+  by (metis append_Cons append_Nil ok_0 ok_ADD ok_LD ok_LDI)
 
 lemma "ok (Suc (Suc 0)) [LOAD x, ADD, ADD, LOAD y] (Suc (Suc 0))"
-(* your definition/proof here *)
+  by (metis append_Cons append_Nil ok_0 ok_ADD ok_LD)
 
 text {* Prove that @{text ok} correctly computes the final stack size: *}
 
 lemma "\<lbrakk>ok n is n'; length stk = n\<rbrakk> \<Longrightarrow> length (exec is s stk) = n'"
-(* your definition/proof here *)
+  apply(induction arbitrary: stk rule: ok.induct)
+     apply(auto)
+  by (smt (z3) add_is_0 add_left_cancel exec1.elims instr.distinct(3) instr.distinct(5) length_Cons list.size(3) not_one_le_zero plus_1_eq_Suc zero_less_one_class.zero_le_one)
 
 text {*
 Lemma @{thm [source] length_Suc_conv} may come in handy.
@@ -344,6 +344,19 @@ some suitable value of @{text "?"}.
 \endexercise
 *}
 
+lemma ok_append: "ok n' x n'' \<Longrightarrow> ok n y n' \<Longrightarrow> ok n (y @ x) n''"
+  apply(induction rule: ok.induct)
+     apply simp
+    apply (metis append.assoc ok_LDI)
+  apply (metis append.assoc ok_LD)
+  by (metis append_eq_appendI ok_ADD)
+
+theorem "ok n (comp x) (Suc n)"
+  apply(induction x arbitrary: n)
+    apply (metis append_self_conv2 comp.simps(1) ok.simps)
+   apply (metis append_Nil comp.simps(2) ok.simps)
+  apply(auto intro: ok_ADD ok_append)
+  done
 
 end
 
